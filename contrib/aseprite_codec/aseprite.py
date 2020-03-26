@@ -35,15 +35,13 @@
 """Decoder for Aseprite animation files in .ase or .aseprite format.
 """
 
-__docformat__ = 'restructuredtext'
-__version__ = '$Id: $'
-
-import struct
+import io
 import zlib
+import struct
 
 from pyglet.image import ImageData, Animation, AnimationFrame
 from pyglet.image.codecs import ImageDecoder, ImageDecodeException
-from pyglet.compat import BytesIO
+
 
 #   Documentation for the Aseprite format can be found here:
 #   https://raw.githubusercontent.com/aseprite/aseprite/master/docs/ase-file-specs.md
@@ -51,7 +49,7 @@ from pyglet.compat import BytesIO
 
 BYTE = "B"
 WORD = "H"
-SIGNED_WORD = "h"
+SHORT = "h"
 DWORD = "I"
 
 BLEND_MODES = {0: 'Normal',
@@ -92,7 +90,7 @@ def _chunked_iter(seq, size):
 #   Class for Aseprite compliant header
 #########################################
 
-class AsepriteHeader(object):
+class AsepriteHeader:
     def __init__(self, file):
         self.file_size = _unpack(DWORD, file)
         self.magic_number = hex(_unpack(WORD, file))
@@ -127,7 +125,7 @@ class Frame(object):
         self.layers = [c for c in self.chunks if type(c) == LayerChunk]
 
     def _parse_chunks(self):
-        fileobj = BytesIO(self._data)
+        fileobj = io.BytesIO(self._data)
         chunks = []
         for chunk in range(self.num_chunks):
             chunk_size = _unpack(DWORD, fileobj)
@@ -155,14 +153,14 @@ class Frame(object):
 
     def _pad_pixels(self, cel):
         """For cels that dont fill the entire frame, pad with zeros."""
-        fileobj = BytesIO(cel.pixel_data)
+        fileobj = io.BytesIO(cel.pixel_data)
 
         padding = b'\x00\x00\x00\x00'
-        top_pad = bytes(padding) * (self.width * cel.y_pos)
-        left_pad = bytes(padding) * cel.x_pos
-        right_pad = bytes(padding) * (self.width - cel.x_pos - cel.width)
-        bottom_pad = bytes(padding) * (self.width * (self.height - cel.height - cel.y_pos))
-        line_size = cel.width * len(padding)
+        top_pad = padding * (self.width * cel.y_pos)
+        left_pad = padding * cel.x_pos
+        right_pad = padding * (self.width - cel.x_pos - cel.width)
+        bottom_pad = padding * (self.width * (self.height - cel.height - cel.y_pos))
+        line_size = cel.width * 4   # (RGBA)
 
         pixel_array = top_pad
         for i in range(cel.height):
@@ -179,9 +177,9 @@ class Frame(object):
 
         if mode == 'Normal':
             final_array = []
-            # If RGB values are > 0, use the top pixel.
+            # If RGBA values are > 0, use the top pixel.
             for bottom_pixel, top_pixel in zip(bottom_iter, top_iter):
-                if sum(top_pixel[:3]) > 0:
+                if any(top_pixel) > 0:      # Any of R, G, B, A > 0
                     final_array.extend(top_pixel)
                 else:
                     final_array.extend(bottom_pixel)
@@ -189,7 +187,7 @@ class Frame(object):
 
         # TODO: implement additional blend modes
         else:
-            raise ImageDecodeException('Unsupported blend mode.')
+            raise ImageDecodeException("Unsupported blend mode: '{}'".format(mode))
 
     def _convert_to_rgba(self, cel):
         if self.color_depth == 8:
@@ -217,7 +215,7 @@ class Frame(object):
 
     def get_pixel_array(self, layers):
         # Start off with an empty RGBA base:
-        pixel_array = bytes(4) * self.width * self.height
+        pixel_array = bytes(4 * self.width * self.height)
 
         # Blend each layer's cel data one-by-one:
         for cel in self.cels:
@@ -233,7 +231,7 @@ class Frame(object):
 #   Aseprite Chunk type definitions
 #########################################
 
-class Chunk(object):
+class Chunk:
     def __init__(self, size, chunk_type):
         self.size = size
         self.chunk_type = chunk_type
@@ -241,8 +239,8 @@ class Chunk(object):
 
 class LayerChunk(Chunk):
     def __init__(self, size, chunk_type, data):
-        super(LayerChunk, self).__init__(size, chunk_type)
-        fileobj = BytesIO(data)
+        super().__init__(size, chunk_type)
+        fileobj = io.BytesIO(data)
         self.flags = _unpack(WORD, fileobj)
         self.layer_type = _unpack(WORD, fileobj)
         self.child_level = _unpack(WORD, fileobj)
@@ -259,11 +257,11 @@ class LayerChunk(Chunk):
 
 class CelChunk(Chunk):
     def __init__(self, size, chunk_type, data):
-        super(CelChunk, self).__init__(size, chunk_type)
-        fileobj = BytesIO(data)
+        super().__init__(size, chunk_type)
+        fileobj = io.BytesIO(data)
         self.layer_index = _unpack(WORD, fileobj)
-        self.x_pos = _unpack(SIGNED_WORD, fileobj)
-        self.y_pos = _unpack(SIGNED_WORD, fileobj)
+        self.x_pos = _unpack(SHORT, fileobj)
+        self.y_pos = _unpack(SHORT, fileobj)
         self.opacity_level = _unpack(BYTE, fileobj)
         self.cel_type = _unpack(WORD, fileobj)
         _zero_unused = _unpack(BYTE * 7, fileobj)
@@ -281,19 +279,19 @@ class CelChunk(Chunk):
 
 class PathChunk(Chunk):
     def __init__(self, size, chunk_type, data):
-        super(PathChunk, self).__init__(size, chunk_type)
+        super().__init__(size, chunk_type)
 
 
 class FrameTagsChunk(Chunk):
     def __init__(self, size, chunk_type, data):
-        super(FrameTagsChunk, self).__init__(size, chunk_type)
+        super().__init__(size, chunk_type)
         # TODO: unpack this data.
 
 
 class PaletteChunk(Chunk):
     def __init__(self, size, chunk_type, data):
-        super(PaletteChunk, self).__init__(size, chunk_type)
-        fileobj = BytesIO(data)
+        super().__init__(size, chunk_type)
+        fileobj = io.BytesIO(data)
         self.palette_size = _unpack(DWORD, fileobj)
         self.first_color_index = _unpack(DWORD, fileobj)
         self.last_color_index = _unpack(DWORD, fileobj)
@@ -312,13 +310,13 @@ class PaletteChunk(Chunk):
 
 class UserDataChunk(Chunk):
     def __init__(self, size, chunk_type, data):
-        super(UserDataChunk, self).__init__(size, chunk_type)
+        super().__init__(size, chunk_type)
         # TODO: unpack this data.
 
 
 class DeprecatedChunk(Chunk):
     def __init__(self, size, chunk_type, data):
-        super(DeprecatedChunk, self).__init__(size, chunk_type)
+        super().__init__(size, chunk_type)
 
 
 #########################################

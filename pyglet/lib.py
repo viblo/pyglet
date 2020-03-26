@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------
 # pyglet
 # Copyright (c) 2006-2008 Alex Holkner
-# Copyright (c) 2008-2019 pyglet contributors
+# Copyright (c) 2008-2020 pyglet contributors
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -36,11 +36,6 @@
 
 These extend and correct ctypes functions.
 """
-from __future__ import print_function
-from builtins import object, str
-
-__docformat__ = 'restructuredtext'
-__version__ = '$Id: $'
 
 import os
 import re
@@ -66,7 +61,7 @@ else:
     _local_lib_paths = None
 
 
-class _TraceFunction(object):
+class _TraceFunction:
     def __init__(self, func):
         self.__dict__['_func'] = func
 
@@ -83,7 +78,7 @@ class _TraceFunction(object):
         setattr(self._func, name, value)
 
 
-class _TraceLibrary(object):
+class _TraceLibrary:
     def __init__(self, library):
         self._library = library
         print(library)
@@ -95,7 +90,7 @@ class _TraceLibrary(object):
 
 
 if _is_pyglet_doc_run:
-    class LibraryMock(object):
+    class LibraryMock:
         """Mock library used when generating documentation."""
         def __getattr__(self, name):
             return LibraryMock()
@@ -107,7 +102,7 @@ if _is_pyglet_doc_run:
             return LibraryMock()
 
 
-class LibraryLoader(object):
+class LibraryLoader:
 
     platform = pyglet.compat_platform
     # this is only for library loading, don't include it in pyglet.platform
@@ -152,9 +147,6 @@ class LibraryLoader(object):
                     lib = _TraceLibrary(lib)
                 return lib
             except OSError as o:
-                if self.platform == "win32" and o.winerror != 126:
-                    print("Unexpected error loading library %s: %s" % (name, str(o)))
-                    raise
                 path = self.find_library(name)
                 if path:
                     try:
@@ -166,6 +158,9 @@ class LibraryLoader(object):
                         return lib
                     except OSError:
                         pass
+                elif self.platform == "win32" and o.winerror != 126:
+                    raise ImportError("Unexpected error loading library %s: %s" % (name, str(o)))
+
         raise ImportError('Library "%s" not found.' % names[0])
 
     def find_library(self, name):
@@ -212,7 +207,7 @@ class MachOLibraryLoader(LibraryLoader):
         libname = os.path.basename(path)
         search_path = []
 
-        if '.' not in libname:
+        if '.dylib' not in libname:
             libname = 'lib' + libname + '.dylib'
 
         # py2app support
@@ -221,6 +216,10 @@ class MachOLibraryLoader(LibraryLoader):
                                             '..',
                                             'Frameworks',
                                             libname))
+
+        # conda support
+        if os.environ.get('CONDA_PREFIX', False):
+            search_path.append(os.path.join(os.environ['CONDA_PREFIX'], 'lib', libname))
 
         # pyinstaller.py sets sys.frozen to True, and puts dylibs in
         # Contents/MacOS, which path pyinstaller puts in sys._MEIPASS
@@ -287,7 +286,7 @@ class LinuxLibraryLoader(LibraryLoader):
     @staticmethod
     def _find_libs(directories):
         cache = {}
-        lib_re = re.compile('lib(.*)\.so(?:$|\.)')
+        lib_re = re.compile(r'lib(.*)\.so(?:$|\.)')
         for directory in directories:
             try:
                 for file in os.listdir(directory):

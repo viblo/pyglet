@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------
 # pyglet
 # Copyright (c) 2006-2008 Alex Holkner
-# Copyright (c) 2008-2019 pyglet contributors
+# Copyright (c) 2008-2020 pyglet contributors
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -128,15 +128,7 @@ Retrieving data with the format and pitch given in `ImageData.format` and
 use of the data in this arbitrary format).
 
 """
-
-from __future__ import division
-from builtins import bytes
-from builtins import zip
-
-__docformat__ = 'restructuredtext'
-__version__ = '$Id$'
-
-from io import open
+from io import open, BytesIO
 import re
 import weakref
 
@@ -145,7 +137,7 @@ from ctypes import *
 from pyglet.gl import *
 from pyglet.gl import gl_info
 from pyglet.window import *
-from pyglet.compat import asbytes, bytes_type, BytesIO
+from pyglet.util import asbytes
 
 from .codecs import ImageEncodeException, ImageDecodeException
 from .codecs import add_default_image_codecs, add_decoders, add_encoders
@@ -307,7 +299,7 @@ def _is_pow2(v):
     return (v & (v - 1)) == 0
 
 
-class ImagePattern(object):
+class ImagePattern:
     """Abstract image creation class."""
 
     def create_image(self, width, height):
@@ -373,7 +365,7 @@ class CheckerImagePattern(ImagePattern):
         return ImageData(width, height, 'RGBA', data)
 
 
-class AbstractImage(object):
+class AbstractImage:
     """Abstract class representing an image.
 
     :Parameters:
@@ -545,7 +537,7 @@ class AbstractImage(object):
         raise ImageException('Cannot blit %r to a texture.' % self)
 
 
-class AbstractImageSequence(object):
+class AbstractImageSequence:
     """Abstract sequence of images.
 
     The sequence is useful for storing image animations or slices of a volume.
@@ -1054,8 +1046,8 @@ class ImageData(AbstractImage):
             packed_pitch = self.width * len(current_format)
             if abs(self._current_pitch) != packed_pitch:
                 # Pitch is wider than pixel data, need to go row-by-row.
-                rows = re.findall(
-                    asbytes('.') * abs(self._current_pitch), data, re.DOTALL)
+                new_pitch = abs(self._current_pitch)
+                rows = [data[i:i+new_pitch] for i in range(0, len(data), new_pitch)]
                 rows = [swap_pattern.sub(repl, r[:packed_pitch]) for r in rows]
                 data = asbytes('').join(rows)
             else:
@@ -1069,26 +1061,26 @@ class ImageData(AbstractImage):
             diff = abs(current_pitch) - abs(pitch)
             if diff > 0:
                 # New pitch is shorter than old pitch, chop bytes off each row
-                pattern = re.compile(
-                    asbytes('(%s)%s' % ('.' * abs(pitch), '.' * diff)), re.DOTALL)
-                data = pattern.sub(asbytes(r'\1'), data)
+                new_pitch = abs(pitch)
+                rows = [data[i:i+new_pitch-diff] for i in range(0, len(data), new_pitch)]
             elif diff < 0:
                 # New pitch is longer than old pitch, add '0' bytes to each row
-                pattern = re.compile(
-                    asbytes('(%s)' % ('.' * abs(current_pitch))), re.DOTALL)
-                pad = '.' * -diff
-                data = pattern.sub(asbytes(r'\1%s' % pad), data)
+                new_pitch = abs(current_pitch)
+                padding = asbytes(1) * -diff
+                rows = [data[i:i+new_pitch] + padding for i in range(0, len(data), new_pitch)]
 
             if current_pitch * pitch < 0:
                 # Pitch differs in sign, swap row order
-                rows = [data[i:i+abs(pitch)] for i in range(0, len(data), abs(pitch))]
+                new_pitch = abs(pitch)
+                rows = [data[i:i+new_pitch] for i in range(0, len(data), new_pitch)]
                 rows.reverse()
-                data = asbytes('').join(rows)
+            
+            data = asbytes('').join(rows)
 
         return asbytes(data)
 
     def _ensure_string_data(self):
-        if type(self._current_data) is not bytes_type:
+        if type(self._current_data) is not bytes:
             buf = create_string_buffer(len(self._current_data))
             memmove(buf, self._current_data, len(self._current_data))
             self._current_data = buf.raw
@@ -1173,7 +1165,8 @@ class ImageDataRegion(ImageData):
 
         self._ensure_string_data()
         data = self._convert(self._current_format, abs(self._current_pitch))
-        rows = re.findall(b'.' * abs(self._current_pitch), data, re.DOTALL)
+        new_pitch = abs(self._current_pitch)
+        rows = [data[i:i+new_pitch] for i in range(0, len(data), new_pitch)]
         rows = [row[x1:x2] for row in rows[self.y:self.y + self.height]]
         self._current_data = b''.join(rows)
         self._current_pitch = self.width * len(self._current_format)
@@ -1208,8 +1201,7 @@ class CompressedImageData(AbstractImage):
     _current_texture = None
     _current_mipmap_texture = None
 
-    def __init__(self, width, height, gl_format, data,
-                 extension=None, decoder=None):
+    def __init__(self, width, height, gl_format, data, extension=None, decoder=None):
         """Construct a CompressedImageData with the given compressed data.
 
         :Parameters:
@@ -1230,9 +1222,6 @@ class CompressedImageData(AbstractImage):
                 required extension is not present.
                 
         """
-        if not _is_pow2(width) or not _is_pow2(height):
-            raise ImageException('Dimensions of %r must be powers of 2' % self)
-
         super(CompressedImageData, self).__init__(width, height)
         self.data = data
         self.gl_format = gl_format
@@ -1276,27 +1265,27 @@ class CompressedImageData(AbstractImage):
 
     def get_texture(self, rectangle=False, force_rectangle=False):
         if force_rectangle:
-            raise ImageException(
-                'Compressed texture rectangles not supported')
+            raise ImageException('Compressed texture rectangles not supported')
 
         if self._current_texture:
             return self._current_texture
 
-        texture = Texture.create_for_size(
-            GL_TEXTURE_2D, self.width, self.height)
+        tex_id = GLuint()
+        glGenTextures(1, byref(tex_id))
+        texture = Texture(self.width, self.height, GL_TEXTURE_2D, tex_id.value)
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, Texture.default_min_filter)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, Texture.default_mag_filter)
+
         if self.anchor_x or self.anchor_y:
             texture.anchor_x = self.anchor_x
             texture.anchor_y = self.anchor_y
 
-        glBindTexture(texture.target, texture.id)
-        glTexParameteri(texture.target, GL_TEXTURE_MIN_FILTER, texture.min_filter)
-        glTexParameteri(texture.target, GL_TEXTURE_MAG_FILTER, texture.mag_filter)
-
         if self._have_extension():
-            glCompressedTexImage2DARB(texture.target, texture.level,
-                                      self.gl_format,
-                                      self.width, self.height, 0,
-                                      len(self.data), self.data)
+            glCompressedTexImage2D(texture.target, texture.level,
+                                   self.gl_format,
+                                   self.width, self.height, 0,
+                                   len(self.data), self.data)
         else:
             image = self.decoder(self.data, self.width, self.height)
             texture = image.get_texture()
@@ -1316,8 +1305,7 @@ class CompressedImageData(AbstractImage):
             # just return a non-mipmapped texture.
             return self.get_texture()
 
-        texture = Texture.create_for_size(
-            GL_TEXTURE_2D, self.width, self.height)
+        texture = Texture.create_for_size(GL_TEXTURE_2D, self.width, self.height)
         if self.anchor_x or self.anchor_y:
             texture.anchor_x = self.anchor_x
             texture.anchor_y = self.anchor_y
@@ -1898,7 +1886,7 @@ class DepthTexture(Texture):
         source.blit_to_texture(self.level, x, y, z)
 
 
-class BufferManager(object):
+class BufferManager:
     """Manages the set of framebuffers for a context.
 
     Use :py:func:`~pyglet.image.get_buffer_manager` to obtain the instance of this class for the
@@ -2017,58 +2005,6 @@ def get_buffer_manager():
     if not hasattr(context, 'image_buffer_manager'):
         context.image_buffer_manager = BufferManager()
     return context.image_buffer_manager
-
-
-class FrameBuffer(object):
-
-    def __init__(self):
-        self._id = GLuint()
-        glGenFramebuffers(1, self._id)
-
-    def is_complete(self):
-        return glCheckFramebufferStatus(GL_FRAMEBUFFER, self._id) == GL_FRAMEBUFFER_COMPLETE
-
-    def bind(self):
-        glBindFramebuffer(GL_FRAMEBUFFER, self._id)
-
-    @staticmethod
-    def unbind():
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-    def clear(self):
-        self.bind()
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)
-        self.unbind()
-
-    @classmethod
-    def create(cls, width, height, depth=False, internal_format=GL_RGBA8, fmt=GL_RGBA, type=GL_UNSIGNED_BYTE, layers=1):
-        """
-        Convenient shortcut for creating single color attachment FBOs
-        :param width: Color buffer width
-        :param height: Coller buffer height
-        :param depth: (bool) Create a depth attachment
-        :param internal_format: The internalformat of the color buffer
-        :param fmt: The format of the color buffer
-        :param type: The type of the color buffer
-        :param layers: How many layers to create
-        :return: A new FBO
-        """
-        fbo = FrameBuffer()
-        fbo.bind()
-
-        # Add N layers of color attachments
-        for layer in range(layers):
-            c = Texture.create(width, height, internal_format)
-            c = Texture.create_2d(width=width, height=height, internal_format=internal_format, format=fmt, type=type,
-                                  wrap_s=GL_CLAMP_TO_EDGE, wrap_t=GL_CLAMP_TO_EDGE, wrap_r=GL_CLAMP_TO_EDGE)
-            fbo.add_color_attachment(c)
-
-        # Set depth attachment is specified
-        if depth:
-            pass
-
-        fbo.unbind()
-        return fbo
 
 
 # XXX BufferImage could be generalised to support EXT_framebuffer_object's

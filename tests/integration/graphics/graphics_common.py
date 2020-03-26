@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-
-from __future__ import division
-from builtins import zip
-from builtins import range
-from builtins import object
 from abc import abstractmethod
 import random
 from collections import deque
@@ -49,7 +43,7 @@ def get_feedback(func):
     return vertices, colors, tex_coords
 
 
-class GraphicsGenericTestCase(object):
+class GraphicsGenericTestCase:
     """
     A generic test for asserting vertices positions
     using openGL Feedback Buffer.

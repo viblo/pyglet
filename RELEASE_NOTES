@@ -1,3 +1,138 @@
+pyglet 1.5.2
+Bugfix and minor feature release
+
+Bugfixes
+--------
+- Fix WMF decoder for pre-Windows 8 systems.
+- Fix WMF decoder loading from file-like objects for Windows Vista.
+- Fix WMF decoder crashing when attempting to seek past file duration.
+
+Changes
+-------
+- Allow GStreamer and FFmpeg decoder to load from file-like objects.
+
+
+pyglet 1.5.1
+Bugfix and minor feature release
+
+Bugfixes
+--------
+- Fix issue with changing Label positions by fractional values.
+- Avoid performance issue due to unnecessary context switching with single Window programs.
+- Fix crash on Player.next_source when playing a video with no audio track.
+- Fix crash when disconnecting a Joystick on Windows.
+- Prevent media Players from seeking to negative timestamps.
+- Fix OpenAL audio driver not dispatching events.
+
+Changes
+--------
+- text.TextLayouts are no longer bound to int positioning.
+- Raise exception if attempting to import from legacy Python.
+- Add GStreamer decoder for compressed audio on Linux.
+- Add Windows Media Foundation decoder for compressed audio on Windows.
+
+Improvements
+------------
+- New "file_drops" Window argument to allow drag and drop of files. This is complimented
+  by a new `Window.on_file_drop` event, which returns the mouse position and file path.
+
+
+pyglet 1.5.0
+Bugfix and Maintenance release
+
+Bugfixes
+--------
+- Removed global dubug function access in __del__ methods to prevent smooth shutdown.
+- Fix regression not allow SourceGroups to be queued on Player objects. (#140)
+
+Changes
+-------
+- Support for Python 2 has been dropped. Python 3.5 is now the minimum supported version.
+
+
+pyglet 1.4.10
+Bugfix release
+
+Bugfixes
+--------
+- Explicitly set Window size in game example. (#116)
+- Prevent crash when checking if FFMpeg is available. (#121)
+
+
+pyglet 1.4.9
+Bugfix and small improvement release
+
+Bugfixes
+--------
+- Fix TextLayoutGroup consolidation when using custom Groups for Labels.
+- FFmpeg: Cast 'date' to string instead of int in file_info. (#109)
+- Fix ctypes error caused by incorrectly specifying a Union as an argtype. (#112)
+
+Improvements
+------------
+- Added a simple 2D Camera example to examples/camera.py in the repository.
+- OSX: OpenGL context creation is more lenient with requested versions.
+
+
+pyglet 1.4.8
+Bugfix release
+
+Bugfixes
+--------
+- FFmpeg: fix an occasional crash during seek operation.
+- Revert Event Dispatcher changes from v1.4.7 due to possible bug.
+- Linux: Warn on failure to set vsync, instead of crashing.
+
+
+pyglet 1.4.7
+Bugfix and small improvement release
+
+Bugfixes
+--------
+- Allow creation of non-power-of-two compressed Textures. (#78)
+- Fix EventDispatchers surpressing `AttributeError`s. (#87)
+- Fix external lib loading on Windows under Python 3.8. (#90)
+
+Improvements
+------------
+- Windows: Add support for `Desktop Window Manager` composition for smoother rendering.
+- TextureAtlases allow a single pixel border to avoid rendering artifacts.
+- Add support for `conda`-installed FFmpeg on macOS (#92)
+
+
+pyglet 1.4.6
+Bugfix release
+
+Bugfixes
+--------
+- Fix PNG encoder saving upside-down images due to incorrect pitch. (#83)
+- pyglet.info shows more platform specific information.
+
+
+pyglet 1.4.5
+Bugfix and small improvement release
+
+Bugfixes
+--------
+- Fix Allocator creating orphaned regions.
+- Allow npot compressed texture loading.
+- Fix MachOLibraryLoader failing on lib names containing extra "."s.
+
+Improvements
+------------
+- Documentation has been rebased on the standard RTD theme.
+- Other documentation clarifications and improvements.
+- New `MouseStateHandler` convenience class.
+
+
+pyglet 1.4.4
+Bugfix release.
+
+Bugfixes
+--------
+- Fixed incorrect glXSwapIntervalEXT arguments for Xlib contexts.
+
+
 pyglet 1.4.3
 Bugfix release.
 
@@ -5,6 +140,7 @@ Bugfixes
 --------
 - Fix crash due to inconsistent API when changing Label or HTMLLabel color. (#45)
 - Add support for GLX_EXT_swap_control on Linux platforms.
+
 
 pyglet 1.4.2
 Bugfix and cleanup release.
@@ -21,6 +157,7 @@ Bugfixes
 - Fix invalid argtype in image GDIplus decoder.
 - Change sys.is_epydoc to sys.is_pyglet_doc_run to prevent crashing with Anaconda, etc. (#9)
 - Prevent gl_info.get_version from crashing with blank version string. (#36)
+
 
 pyglet 1.4.1
 ============

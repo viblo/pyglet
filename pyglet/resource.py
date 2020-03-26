@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------
 # pyglet
 # Copyright (c) 2006-2008 Alex Holkner
-# Copyright (c) 2008-2019 pyglet contributors
+# Copyright (c) 2008-2020 pyglet contributors
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -62,7 +62,7 @@ is a list of locations to search for resources.  Locations are searched in the
 order given in the path.  If a location is not valid (for example, if the
 directory does not exist), it is skipped.
 
-Locations in the path beginning with an ampersand (''@'' symbol) specify
+Locations in the path beginning with an "at" symbol (''@'') specify
 Python packages.  Other locations specify a ZIP archive or directory on the
 filesystem.  Locations that are not absolute are assumed to be relative to the
 script home.  Some examples::
@@ -84,21 +84,14 @@ The default path is ``['.']``.  If you modify the path, you must call
 
 .. versionadded:: 1.1
 """
-from future import standard_library
 
-standard_library.install_aliases()
-from builtins import object, str
-
-__docformat__ = 'restructuredtext'
-__version__ = '$Id: $'
-
+import io
 import os
-import weakref
 import sys
 import zipfile
+import weakref
 
 import pyglet
-from pyglet.compat import BytesIO
 
 
 class ResourceNotFoundException(Exception):
@@ -192,7 +185,7 @@ def get_settings_path(name):
         return os.path.expanduser('~/.%s' % name)
 
 
-class Location(object):
+class Location:
     """Abstract resource location.
 
     Given a location, a file can be loaded from that location with the `open`
@@ -259,9 +252,9 @@ class ZIPLocation(Location):
         else:
             path = filename
 
-        forward_slash_path = path.replace(os.sep, '/')  # looks like zip can only handle forward slashes
+        forward_slash_path = path.replace(os.sep, '/')  # zip can only handle forward slashes
         text = self.zip.read(forward_slash_path)
-        return BytesIO(text)
+        return io.BytesIO(text)
 
 
 class URLLocation(Location):
@@ -287,7 +280,7 @@ class URLLocation(Location):
         return urllib.request.urlopen(url)
 
 
-class Loader(object):
+class Loader:
     """Load program resource files from disk.
 
     The loader contains a search path which can include filesystem
@@ -322,7 +315,7 @@ class Loader(object):
             path = ['.']
         if isinstance(path, str):
             path = [path]
-        self.path = [os.path.normpath(p) for p in path]
+        self.path = list(path)
         self._script_home = script_home or get_script_home()
         self._index = None
 
@@ -364,6 +357,7 @@ class Loader(object):
                     path = ''  # interactive
             elif not os.path.isabs(path):
                 # Add script base unless absolute
+                assert r'\\' not in path, "Backslashes are not permitted in relative paths"
                 path = os.path.join(self._script_home, path)
 
             if os.path.isdir(path):
@@ -432,16 +426,15 @@ class Loader(object):
 
                 volume_index += 1
 
-            zip_stream = BytesIO(bytes_)
+            zip_stream = io.BytesIO(bytes_)
             if zipfile.is_zipfile(zip_stream):
                 return zip_stream
             else:
                 return None
 
     def _index_file(self, name, location):
-        normed_name = os.path.normpath(name)
-        if normed_name not in self._index:
-            self._index[normed_name] = location
+        if name not in self._index:
+            self._index[name] = location
 
     def file(self, name, mode='rb'):
         """Load a resource.
@@ -455,13 +448,12 @@ class Loader(object):
 
         :rtype: file object
         """
-        normed_name = os.path.normpath(name)
         self._require_index()
         try:
-            location = self._index[normed_name]
-            return location.open(normed_name, mode)
+            location = self._index[name]
+            return location.open(name, mode)
         except KeyError:
-            raise ResourceNotFoundException(normed_name)
+            raise ResourceNotFoundException(name)
 
     def location(self, name):
         """Get the location of a resource.
@@ -528,7 +520,7 @@ class Loader(object):
         """
         # Large images are not placed in an atlas
         max_texture_size = pyglet.image.get_max_texture_size()
-        max_size = min(1024, max_texture_size / 2)
+        max_size = min(2048, max_texture_size)
         if width > max_size or height > max_size:
             return None
 
@@ -541,7 +533,8 @@ class Loader(object):
         try:
             texture_bin = self._texture_atlas_bins[bin_size]
         except KeyError:
-            texture_bin = self._texture_atlas_bins[bin_size] = pyglet.image.atlas.TextureBin()
+            texture_bin = pyglet.image.atlas.TextureBin(border=True)
+            self._texture_atlas_bins[bin_size] = texture_bin
 
         return texture_bin
 

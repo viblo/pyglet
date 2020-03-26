@@ -1,7 +1,6 @@
-from __future__ import division
-from builtins import range
-from tests import mock
 import random
+from unittest import mock
+
 from tests.base.future_test import FutureTestCase
 
 from pyglet.media.player import Player, PlayerGroup
@@ -152,7 +151,7 @@ class PlayerTestCase(FutureTestCase):
         self.mock_clock.unschedule.assert_called_with(self.player.update_texture)
 
     def pretend_player_at_time(self, t):
-        self.player._mclock.set_time(t)
+        self.player._timer.set_time(t)
 
     def pretend_silent_driver_player_at_time(self, t):
         self.mock_silent_audio_driver_player.get_time.return_value = t

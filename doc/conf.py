@@ -112,9 +112,6 @@ autosummary_generate = False
 
 inheritance_graph_attrs = dict(rankdir="LR", size='""')
 
-# If your documentation needs a minimal Sphinx version, state it here.
-needs_sphinx = '1.3'
-
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc',
@@ -123,30 +120,27 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.todo',
               'sphinx.ext.napoleon']
 
-autodoc_member_order='groupwise'
+autodoc_member_order = 'groupwise'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
 # The suffix of source filenames.
-source_suffix = '.txt'
-
-# The encoding of source files.
-#source_encoding = 'utf-8-sig'
+source_suffix = '.rst'
 
 # The master toctree document.
 master_doc = 'index'
 
 # General information about the project.
 project = u'pyglet'
-copyright = u'2006-2008, Alex Holkner. 2008-2019 pyglet contributors'
+copyright = u'2006-2008, Alex Holkner. 2008-2020 pyglet contributors'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = '1.4'
+version = '1.5'
 # The full version, including alpha/beta/rc tags.
 release = pyglet.version
 
@@ -189,7 +183,7 @@ modindex_common_prefix = ['pyglet.']
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'pyglet'
+html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -197,7 +191,7 @@ html_theme = 'pyglet'
 #html_theme_options = {}
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = ["ext/theme"]
+# html_theme_path = ["ext/theme"]
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
