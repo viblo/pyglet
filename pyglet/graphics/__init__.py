@@ -161,7 +161,6 @@ video drivers, and requires indexed vertex lists.
 
 import ctypes
 
-import pyglet
 from pyglet.gl import *
 from pyglet.graphics import vertexbuffer, vertexattribute, vertexdomain
 from pyglet.graphics.shader import Shader, ShaderProgram, UniformBufferObject
@@ -189,12 +188,12 @@ def draw(size, mode, *data):
     glGenVertexArrays(1, vao_id)
     glBindVertexArray(vao_id)
     # Activate shader program:
-    group = get_default_group()
-    group.set_state()
+    shader_program = get_default_shader()
+    shader_program.bind()
 
     buffers = []
     for fmt, array in data:
-        attribute = vertexattribute.create_attribute(group.program.id, fmt)
+        attribute = vertexattribute.create_attribute(shader_program.id, fmt)
         assert size == len(array) // attribute.count, 'Data for %s is incorrect length' % fmt
 
         buffer = vertexbuffer.create_buffer(size * attribute.stride, mappable=False)
@@ -208,7 +207,8 @@ def draw(size, mode, *data):
     glDrawArrays(mode, 0, size)
 
     # Deactivate shader program:
-    group.unset_state()
+    shader_program.unbind()
+
     # Discard everything after drawing:
     del buffers
     glBindVertexArray(0)
@@ -234,12 +234,12 @@ def draw_indexed(size, mode, indices, *data):
     glGenVertexArrays(1, vao_id)
     glBindVertexArray(vao_id)
     # Activate shader program:
-    group = get_default_group()
-    group.set_state()
+    shader_program = get_default_shader()
+    shader_program.bind()
 
     buffers = []
     for fmt, array in data:
-        attribute = vertexattribute.create_attribute(group.program.id, fmt)
+        attribute = vertexattribute.create_attribute(shader_program.id, fmt)
         assert size == len(array) // attribute.count, 'Data for %s is incorrect length' % fmt
 
         buffer = vertexbuffer.create_buffer(size * attribute.stride, mappable=False)
@@ -264,7 +264,7 @@ def draw_indexed(size, mode, indices, *data):
     glFlush()
 
     # Deactivate shader program:
-    group.unset_state()
+    shader_program.unbind()
     # Discard everything after drawing:
     del buffers
     glBindVertexArray(0)
