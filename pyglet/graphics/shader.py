@@ -83,14 +83,17 @@ _attribute_types = {
 
 
 class _Attribute:
-    __slots__ = 'name', 'type', 'size', 'location', 'c_type_count'
+    __slots__ = 'name', 'type', 'size', 'location', 'ctype', 'length'
 
     def __init__(self, name, attr_type, size, location):
         self.name = name
         self.type = attr_type
         self.size = size
         self.location = location
-        self.c_type_count = _attribute_types[attr_type]
+        self.ctype, self.length = _attribute_types[attr_type]
+
+    def __repr__(self):
+        return f"Attribute('{self.name}', location={self.location}, length={self.length})"
 
 
 class _Uniform:
@@ -195,8 +198,9 @@ class Shader:
     def __del__(self):
         try:
             glDeleteShader(self._id)
-        except ImportError:
-            # The interpreter is shutting down.
+        except (ImportError, AttributeError):
+            # Interpreter is shutting down,
+            # or Shader failed to compile.
             pass
 
         if _debug_gl_shaders:
@@ -296,8 +300,9 @@ class ShaderProgram:
     def __del__(self):
         try:
             glDeleteProgram(self._id)
-        except ImportError:
-            # The interpreter is shutting down.
+        except (ImportError, AttributeError):
+            # Interpreter is shutting down,
+            # or ShaderProgram failed to link.
             pass
 
     def __setitem__(self, key, value):
@@ -337,10 +342,13 @@ class ShaderProgram:
             loc = glGetAttribLocation(self._id, create_string_buffer(a_name.encode('utf-8')))
             self._attributes[a_name] = _Attribute(a_name, a_type, a_size, loc)
 
+            if _debug_gl_shaders:
+                print("Found attribute: {0}, type: {1}, size: {2}, location: {3}".format(a_name, a_type, a_size, loc))
+
     def _introspect_uniforms(self):
         for index in range(self._get_number(GL_ACTIVE_UNIFORMS)):
-            uniform_name, u_type, u_size = self._query_uniform(index)
-            loc = glGetUniformLocation(self._id, create_string_buffer(uniform_name.encode('utf-8')))
+            u_name, u_type, u_size = self._query_uniform(index)
+            loc = glGetUniformLocation(self._id, create_string_buffer(u_name.encode('utf-8')))
 
             if loc == -1:      # Skip uniforms that may be in Uniform Blocks
                 continue
@@ -363,12 +371,12 @@ class ShaderProgram:
 
                 if _debug_gl_shaders:
                     print("Found uniform: {0}, type: {1}, size: {2}, location: {3}, length: {4},"
-                          " count: {5}".format(uniform_name, u_type, u_size, loc, length, count))
+                          " count: {5}".format(u_name, u_type, u_size, loc, length, count))
 
             except KeyError:
                 raise GLException("Unsupported Uniform type {0}".format(u_type))
 
-            self._uniforms[uniform_name] = _Uniform(setter=setter, getter=getter)
+            self._uniforms[u_name] = _Uniform(setter=setter, getter=getter)
 
     def _introspect_uniform_blocks(self):
         p_id = self._id
