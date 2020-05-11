@@ -391,6 +391,11 @@ class Batch:
         """
         self._draw_list_dirty = True
 
+    def add_from_shader(self, count, mode, group, shaderprogram):
+        # TODO: remove this temporary test.
+        data = tuple(f"{attrib.name}{attrib.length}f" for attrib in shaderprogram._attributes.values())
+        return self.add(count, mode, group, *data)
+
     def add(self, count, mode, group, *data):
         """Add a vertex list to the batch.
 
@@ -775,7 +780,7 @@ class TextureGroup(Group):
 #: The default Shaders
 
 _vertex_source = """#version 330 core
-    in vec4 vertices;
+    in vec3 vertices;
     in vec4 colors;
     in vec2 tex_coords;
     out vec4 vertex_colors;
@@ -790,8 +795,7 @@ _vertex_source = """#version 330 core
 
     void main()
     {
-        gl_Position = window.projection * window.view * vertices;
-
+        gl_Position = window.projection * window.view * vec4(vertices, 1);
         vertex_colors = colors;
         texture_coords = tex_coords;
     }
