@@ -161,6 +161,7 @@ video drivers, and requires indexed vertex lists.
 
 import ctypes
 
+import pyglet
 from pyglet.gl import *
 from pyglet.graphics import vertexbuffer, vertexattribute, vertexdomain
 from pyglet.graphics.shader import Shader, ShaderProgram, UniformBufferObject
@@ -188,12 +189,20 @@ def draw(size, mode, *data):
     glGenVertexArrays(1, vao_id)
     glBindVertexArray(vao_id)
     # Activate shader program:
-    shader_program = get_default_shader()
-    shader_program.bind()
+    shaderprogram = get_default_shader()
+    shaderprogram.bind()
+
+    # formats, initial_arrays = _parse_data(data)
+    # for fmt, attribute in zip(formats, shaderprogram.attributes):
+    #     attribute.format = fmt
 
     buffers = []
-    for fmt, array in data:
-        attribute = vertexattribute.create_attribute(shader_program.id, fmt)
+    for i, (fmt, array) in enumerate(data):
+        count, gl_type, normalize = vertexattribute.parse_format(fmt)
+
+        a = shaderprogram.attributes[i]
+        attribute = vertexattribute.VertexAttribute(a.name, a.location, count, gl_type, normalize)
+
         assert size == len(array) // attribute.count, 'Data for %s is incorrect length' % fmt
 
         buffer = vertexbuffer.create_buffer(size * attribute.stride, mappable=False)
@@ -207,7 +216,7 @@ def draw(size, mode, *data):
     glDrawArrays(mode, 0, size)
 
     # Deactivate shader program:
-    shader_program.unbind()
+    shaderprogram.unbind()
 
     # Discard everything after drawing:
     del buffers
@@ -234,12 +243,16 @@ def draw_indexed(size, mode, indices, *data):
     glGenVertexArrays(1, vao_id)
     glBindVertexArray(vao_id)
     # Activate shader program:
-    shader_program = get_default_shader()
-    shader_program.bind()
+    shaderprogram = get_default_shader()
+    shaderprogram.bind()
 
     buffers = []
-    for fmt, array in data:
-        attribute = vertexattribute.create_attribute(shader_program.id, fmt)
+    for i, (fmt, array) in enumerate(data):
+        count, gl_type, normalize = vertexattribute.parse_format(fmt)
+
+        a = shaderprogram.attributes[i]
+        attribute = vertexattribute.VertexAttribute(a.name, a.location, count, gl_type, normalize)
+
         assert size == len(array) // attribute.count, 'Data for %s is incorrect length' % fmt
 
         buffer = vertexbuffer.create_buffer(size * attribute.stride, mappable=False)
@@ -264,7 +277,7 @@ def draw_indexed(size, mode, indices, *data):
     glFlush()
 
     # Deactivate shader program:
-    shader_program.unbind()
+    shaderprogram.unbind()
     # Discard everything after drawing:
     del buffers
     glBindVertexArray(0)
@@ -273,13 +286,14 @@ def draw_indexed(size, mode, indices, *data):
 
 def _parse_data(data):
     """Given a list of data items, returns (formats, initial_arrays)."""
-    assert data, 'No attribute formats given'
-
     # Return tuple (formats, initial_arrays).
+    if not data:
+        return (), ()
     formats = []
     initial_arrays = []
     for i, fmt in enumerate(data):
         if isinstance(fmt, tuple):
+            print(fmt)
             fmt, array = fmt
             initial_arrays.append((i, array))
         formats.append(fmt)
@@ -326,7 +340,7 @@ def vertex_list(count, *data):
     """
     # Note that mode=0 because the default batch is never drawn: vertex lists
     # returned from this function are drawn directly by their draw() method.
-    return get_default_batch().add(count, 0, None, *data)
+    return get_default_batch().add(count, 0, None, None, *data)
 
 
 def vertex_list_indexed(count, indices, *data):
@@ -345,7 +359,7 @@ def vertex_list_indexed(count, indices, *data):
     """
     # Note that mode=0 because the default batch is never drawn: vertex lists
     # returned from this function are drawn directly by their draw() method.
-    return get_default_batch().add_indexed(count, 0, None, indices, *data)
+    return get_default_batch().add_indexed(count, 0, None, None, indices, *data)
 
 
 class Batch:
@@ -391,12 +405,7 @@ class Batch:
         """
         self._draw_list_dirty = True
 
-    def add_from_shader(self, count, mode, group, shaderprogram):
-        # TODO: remove this temporary test.
-        data = tuple(f"{attrib.name}{attrib.length}f" for attrib in shaderprogram._attributes.values())
-        return self.add(count, mode, group, *data)
-
-    def add(self, count, mode, group, *data):
+    def add(self, count, mode, group, shaderprogram, *data):
         """Add a vertex list to the batch.
 
         :Parameters:
@@ -408,23 +417,32 @@ class Batch:
                 See the module summary for additional information.
             `group` : `~pyglet.graphics.Group`
                 Group of the vertex list, or ``None`` if no group is required.
+            'shaderprogram' : `~pyglet.graphics.shader.ShaderProgram`
+                An ShaderProgram, or ``None`` to use the default.
             `data` : data items
-                Attribute formats and initial data for the vertex list.  See
-                the module summary for details.
+                Initial data for the vertex list.  See the module
+                summary for details.
 
         :rtype: :py:class:`~pyglet.graphics.vertexdomain.VertexList`
         """
+        shaderprogram = shaderprogram or get_default_shader()
+
         formats, initial_arrays = _parse_data(data)
-        domain = self._get_domain(False, mode, group, formats)
+        for fmt, attribute in zip(formats, shaderprogram.attributes):
+            attribute.format = fmt
+
+        domain = self._get_domain(False, mode, group, shaderprogram)
 
         # Create vertex list and initialize
         vlist = domain.create(count)
+
         for i, array in initial_arrays:
             vlist.set_attribute_data(i, array)
 
         return vlist
 
-    def add_indexed(self, count, mode, group, indices, *data):
+    def add_indexed(self, count, mode, group, indices, shaderprogram, *data):
+        # TODO: update to new API
         """Add an indexed vertex list to the batch.
 
         :Parameters:
@@ -438,14 +456,21 @@ class Batch:
                 Group of the vertex list, or ``None`` if no group is required.
             `indices` : sequence
                 Sequence of integers giving indices into the vertex list.
+            'shaderprogram' : `~pyglet.graphics.shader.ShaderProgram`
+                An ShaderProgram, or ``None`` to use the default.
             `data` : data items
-                Attribute formats and initial data for the vertex list.  See
-                the module summary for details.
+                Initial data for the vertex list.  See the module
+                summary for details.
 
         :rtype: `IndexedVertexList`
         """
+        shaderprogram = shaderprogram or get_default_shader()
+
         formats, initial_arrays = _parse_data(data)
-        domain = self._get_domain(True, mode, group, formats)
+        for fmt, attribute in zip(formats, shaderprogram.attributes):
+            attribute.format = fmt
+
+        domain = self._get_domain(True, mode, group, shaderprogram)
 
         # Create vertex list and initialize
         vlist = domain.create(count, len(indices))
@@ -479,14 +504,12 @@ class Batch:
                 The batch to migrate to (or the current batch).
 
         """
-        formats = vertex_list.domain.__formats
-        if isinstance(vertex_list, vertexdomain.IndexedVertexList):
-            domain = batch._get_domain(True, mode, group, formats)
-        else:
-            domain = batch._get_domain(False, mode, group, formats)
+        shaderprogram = vertex_list.domain.__shaderprogram
+        is_indexed = isinstance(vertex_list, vertexdomain.IndexedVertexList)
+        domain = batch._get_domain(is_indexed, mode, group, shaderprogram)
         vertex_list.migrate(domain)
 
-    def _get_domain(self, indexed, mode, group, formats):
+    def _get_domain(self, indexed, mode, group, shaderprogram):
         if group is None:
             group = get_default_group()
 
@@ -494,21 +517,16 @@ class Batch:
         if group not in self.group_map:
             self._add_group(group)
 
-        # If not a ShaderGroup, use the default ShaderProgram
-        shader_program = getattr(group, 'program', get_default_shader())
-
-        # Find domain given formats, indices and mode
+        # Find domain given shader, mode, and whether indexed
         domain_map = self.group_map[group]
-        key = (formats, mode, indexed, shader_program.id)
+        key = (shaderprogram, mode, indexed)
         try:
             domain = domain_map[key]
         except KeyError:
             # Create domain
-            if indexed:
-                domain = vertexdomain.create_indexed_domain(shader_program.id, *formats)
-            else:
-                domain = vertexdomain.create_domain(shader_program.id, *formats)
-            domain.__formats = formats
+
+            domain = vertexdomain.create_domain(shaderprogram, indexed=indexed)
+            domain.__shaderprogram = shaderprogram
             domain_map[key] = domain
             self._draw_list_dirty = True
 
@@ -536,10 +554,10 @@ class Batch:
 
             # Draw domains using this group
             domain_map = self.group_map[group]
-            for (formats, mode, indexed, program_id), domain in list(domain_map.items()):
+            for (shaderprogram, mode, indexed), domain in list(domain_map.items()):
                 # Remove unused domains from batch
                 if domain.is_empty:
-                    del domain_map[(formats, mode, indexed, program_id)]
+                    del domain_map[(shaderprogram, mode, indexed)]
                     continue
                 draw_list.append((lambda d, m: lambda: d.draw(m))(domain, mode))
 

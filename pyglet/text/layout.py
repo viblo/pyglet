@@ -361,10 +361,11 @@ class _GlyphBox(_AbstractBox):
 
         vertex_list = layout.batch.add_indexed(n_glyphs * 4, GL_TRIANGLES, group,
                                                indices,
-                                               ('vertices2f/dynamic', vertices),
-                                               ('tex_coords3f/dynamic', tex_coords),
-                                               ('colors4Bn/dynamic', colors),
-                                               'translation2f/dynamic')
+                                               group.program,
+                                               ('2f', vertices),
+                                               ('4Bn', colors),
+                                               ('3f', tex_coords),
+                                               '2f')
 
         context.add_list(vertex_list)
 
@@ -401,17 +402,19 @@ class _GlyphBox(_AbstractBox):
             background_list = layout.batch.add_indexed(len(background_vertices) // 2,
                                                        GL_TRIANGLES, layout.background_decoration_group,
                                                        [0, 1, 2, 0, 2, 3],
-                                                       ('vertices2f/dynamic', background_vertices),
-                                                       ('colors4Bn/dynamic', background_colors),
-                                                       'translation2f/dynamic')
+                                                       layout.background_decoration_group.program,
+                                                       ('2f', background_vertices),
+                                                       ('4Bn', background_colors),
+                                                       '2f')
             context.add_list(background_list)
 
         if underline_vertices:
             underline_list = layout.batch.add(len(underline_vertices) // 2,
                                               GL_LINES, layout.foreground_decoration_group,
-                                              ('vertices2f/dynamic', underline_vertices),
-                                              ('colors4Bn/dynamic', underline_colors),
-                                              'translation2f/dynamic')
+                                              layout.foreground_decoration_group.program,
+                                              ('2f', underline_vertices),
+                                              ('4Bn', underline_colors),
+                                              '2f')
             context.add_list(underline_list)
 
     def delete(self, layout):

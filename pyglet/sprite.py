@@ -191,7 +191,7 @@ class SpriteGroup(graphics.Group):
     same parent group, texture and blend parameters.
     """
 
-    def __init__(self, texture, blend_src, blend_dest, program=None, order=0, parent=None):
+    def __init__(self, texture, blend_src, blend_dest, program, order=0, parent=None):
         """Create a sprite group.
 
         The group is created internally when a :py:class:`~pyglet.sprite.Sprite`
@@ -217,7 +217,7 @@ class SpriteGroup(graphics.Group):
         self.texture = texture
         self.blend_src = blend_src
         self.blend_dest = blend_dest
-        self.program = program or _default_program
+        self.program = program
 
     def set_state(self):
         self.program.use()
@@ -239,7 +239,7 @@ class SpriteGroup(graphics.Group):
     def __eq__(self, other):
         return (other.__class__ is self.__class__ and
                 self.program is other.program and
-                self.parent is other.parent and
+                self.parent == other.parent and
                 self.texture.target == other.texture.target and
                 self.texture.id == other.texture.id and
                 self.blend_src == other.blend_src and
@@ -274,7 +274,6 @@ class Sprite(event.EventDispatcher):
                  blend_dest=GL_ONE_MINUS_SRC_ALPHA,
                  batch=None,
                  group=None,
-                 usage='dynamic',
                  subpixel=False,
                  program=None):
         """Create a sprite.
@@ -296,10 +295,6 @@ class Sprite(event.EventDispatcher):
                 Optional batch to add the sprite to.
             `group` : `~pyglet.graphics.Group`
                 Optional parent group of the sprite.
-            `usage` : str
-                Vertex buffer object usage hint, one of ``"none"``,
-                ``"stream"``, ``"dynamic"`` (default) or ``"static"``.  Applies
-                only to vertex data.
             `subpixel` : bool
                 Allow floating-point coordinates for the sprite. By default,
                 coordinates are restricted to integer values.
@@ -319,14 +314,14 @@ class Sprite(event.EventDispatcher):
         else:
             self._texture = img.get_texture()
 
-        if isinstance(img, image.TextureArrayRegion):
-            program = _default_array_program
-        else:
-            program = _default_program
+        if not program:
+            if isinstance(img, image.TextureArrayRegion):
+                program = _default_array_program
+            else:
+                program = _default_program
 
         self._batch = batch or graphics.get_default_batch()
         self._group = SpriteGroup(self._texture, blend_src, blend_dest, program, 0, group)
-        self._usage = usage
         self._subpixel = subpixel
         self._create_vertex_list()
 
@@ -459,15 +454,14 @@ class Sprite(event.EventDispatcher):
         self._texture = texture
 
     def _create_vertex_list(self):
-        usage = self._usage
         self._vertex_list = self._batch.add_indexed(
-            4, GL_TRIANGLES, self._group, [0, 1, 2, 0, 2, 3],
-            'position2f/%s' % usage,
-            ('colors4Bn/%s' % usage, (*self._rgb, int(self._opacity)) * 4),
-            ('translate2f/%s' % usage, (self._x, self._y) * 4),
-            ('scale2f/%s' % usage, (self._scale*self._scale_x, self._scale*self._scale_y) * 4),
-            ('rotation1f/%s' % usage, (self._rotation,) * 4),
-            ('tex_coords3f/%s' % usage, self._texture.tex_coords))
+            4, GL_TRIANGLES, self._group, [0, 1, 2, 0, 2, 3], self._group.program,
+            ('2f', (self._x, self._y) * 4),
+            ('4Bn', (*self._rgb, int(self._opacity)) * 4),
+            ('3f', self._texture.tex_coords),
+            ('2f', (self._scale * self._scale_x, self._scale * self._scale_y) * 4),
+            '2f',
+            ('1f', (self._rotation,) * 4))
         self._update_position()
 
     def _update_position(self):

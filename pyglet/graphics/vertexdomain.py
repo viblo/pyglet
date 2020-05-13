@@ -64,17 +64,6 @@ import pyglet
 from pyglet.gl import *
 from pyglet.graphics import allocation, vertexattribute, vertexbuffer
 
-_usage_format_re = re.compile(r"""
-    (?P<attribute>[^/]*)
-    (/ (?P<usage> static|dynamic|stream|none))?
-""", re.VERBOSE)
-
-_gl_usages = {
-    'static': GL_STATIC_DRAW,
-    'dynamic': GL_DYNAMIC_DRAW,
-    'stream': GL_STREAM_DRAW,
-}
-
 
 def _nearest_pow2(v):
     # From http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
@@ -88,52 +77,27 @@ def _nearest_pow2(v):
     return v + 1
 
 
-def create_attribute_usage(shader_program_id, fmt):
-    """Create an attribute and usage pair from a format string.  The
-    format string is as documented in `pyglet.graphics.vertexattribute`, with
-    the addition of an optional usage component::
-
-        usage ::= attribute ( '/' ('static' | 'dynamic' | 'stream') )?
-
-    If the usage is not given it defaults to 'dynamic'.  The usage corresponds
-    to the OpenGL VBO usage hint, and for ``static`` also indicates a
-    preference for interleaved arrays.
-
-    Some examples:
-
-    ``v3f/stream``
-        3D vertex position using floats, for stream usage
-    ``c4b/static``
-        4-byte color attribute, for static usage
-
-    :return: attribute, usage
-    """
-    match = _usage_format_re.match(fmt)
-    attribute_format = match.group('attribute')
-    attribute = vertexattribute.create_attribute(shader_program_id, attribute_format)
-    usage = match.group('usage')
-    if usage:
-        usage = _gl_usages[usage]
-    else:
-        usage = GL_DYNAMIC_DRAW
-
-    return attribute, usage
-
-
-def create_domain(shader_program_id, *attribute_usage_formats):
-    """Create a vertex domain covering the given attribute usage formats.
+def create_domain(shaderprogram, indexed=False):
+    """Create a vertex domain for the supplied ShaderProgram.
     See documentation for :py:func:`create_attribute_usage` and
     :py:func:`pyglet.graphics.vertexattribute.create_attribute` for the grammar
     of these format strings.
 
     :rtype: :py:class:`VertexDomain`
     """
-    attribute_usages = [create_attribute_usage(shader_program_id, f)
-                        for f in attribute_usage_formats]
-    return VertexDomain(attribute_usages)
+    attribute_usages = []
+    for a in shaderprogram.attributes:
+        count, gl_type, normalize = vertexattribute.parse_format(a.format)
+        attribute = vertexattribute.VertexAttribute(a.name, a.location, count, gl_type, normalize)
+        attribute_usages.append((attribute, GL_DYNAMIC_DRAW))
+
+    if indexed:
+        return IndexedVertexDomain(attribute_usages)
+    else:
+        return VertexDomain(attribute_usages)
 
 
-def create_indexed_domain(shader_program_id, *attribute_usage_formats):
+def create_indexed_domain(shaderprogram):
     """Create an indexed vertex domain covering the given attribute usage
     formats.  See documentation for :py:class:`create_attribute_usage` and
     :py:func:`pyglet.graphics.vertexattribute.create_attribute` for the grammar
@@ -141,8 +105,13 @@ def create_indexed_domain(shader_program_id, *attribute_usage_formats):
 
     :rtype: :py:class:`VertexDomain`
     """
-    attribute_usages = [create_attribute_usage(shader_program_id, f)
-                        for f in attribute_usage_formats]
+
+    attribute_usages = []
+    for a in shaderprogram.attributes:
+        count, gl_type, normalize = vertexattribute.parse_format(a.format)
+        attribute = vertexattribute.VertexAttribute(a.name, a.location, count, gl_type, normalize)
+        attribute_usages.append((attribute, GL_DYNAMIC_DRAW))
+
     return IndexedVertexDomain(attribute_usages)
 
 
@@ -170,8 +139,7 @@ class VertexDomain:
             else:
                 # Create non-interleaved buffer
                 attributes.append(attribute)
-                attribute.buffer = vertexbuffer.create_buffer(
-                    attribute.stride * self.allocator.capacity, usage=usage)
+                attribute.buffer = vertexbuffer.create_buffer(attribute.stride * self.allocator.capacity, usage=usage)
                 attribute.buffer.element_size = attribute.stride
                 attribute.buffer.attributes = (attribute,)
                 self.buffer_attributes.append((attribute.buffer, (attribute,)))
