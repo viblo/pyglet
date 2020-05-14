@@ -293,7 +293,6 @@ def _parse_data(data):
     initial_arrays = []
     for i, fmt in enumerate(data):
         if isinstance(fmt, tuple):
-            print(fmt)
             fmt, array = fmt
             initial_arrays.append((i, array))
         formats.append(fmt)

@@ -97,24 +97,6 @@ def create_domain(shaderprogram, indexed=False):
         return VertexDomain(attribute_usages)
 
 
-def create_indexed_domain(shaderprogram):
-    """Create an indexed vertex domain covering the given attribute usage
-    formats.  See documentation for :py:class:`create_attribute_usage` and
-    :py:func:`pyglet.graphics.vertexattribute.create_attribute` for the grammar
-    of these format strings.
-
-    :rtype: :py:class:`VertexDomain`
-    """
-
-    attribute_usages = []
-    for a in shaderprogram.attributes:
-        count, gl_type, normalize = vertexattribute.parse_format(a.format)
-        attribute = vertexattribute.VertexAttribute(a.name, a.location, count, gl_type, normalize)
-        attribute_usages.append((attribute, GL_DYNAMIC_DRAW))
-
-    return IndexedVertexDomain(attribute_usages)
-
-
 class VertexDomain:
     """Management of a set of vertex lists.
 
@@ -122,10 +104,9 @@ class VertexDomain:
     :py:func:`create_domain` function.
     """
     version = 0
-    _initial_count = 16
 
     def __init__(self, attribute_usages):
-        self.allocator = allocation.Allocator(self._initial_count)
+        self.allocator = allocation.Allocator(16)
 
         static_attributes = []
         attributes = []
