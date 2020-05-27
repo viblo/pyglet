@@ -305,11 +305,11 @@ def get_default_group():
 
 def get_default_shader():
     try:
-        return current_context.object_space.pyglet_graphics_default_shader
+        return pyglet.gl.current_context.pyglet_graphics_default_shader
     except AttributeError:
         default_shader_program = ShaderProgram(_default_vert_shader, _default_frag_shader)
-        current_context.object_space.pyglet_graphics_default_shader = default_shader_program
-        return current_context.object_space.pyglet_graphics_default_shader
+        pyglet.gl.current_context.pyglet_graphics_default_shader = default_shader_program
+        return pyglet.gl.current_context.pyglet_graphics_default_shader
 
 
 def vertex_list(count, *data):

@@ -1,5 +1,7 @@
-from weakref import proxy
 from ctypes import *
+from weakref import proxy
+
+import pyglet.gl
 
 from pyglet.graphics.vertexbuffer import create_buffer
 from pyglet import options
@@ -210,12 +212,12 @@ class Shader:
 class ShaderProgram:
     """OpenGL Shader Program"""
 
-    __slots__ = '_id', '_active', '_attributes', '_uniforms', '_uniform_blocks', '__weakref__'
+    __slots__ = '_id', '_active', '_attributes', '_uniforms', '_uniform_blocks', '_context', '__weakref__'
 
     # Cache UBOs, and return the same object for any Shader that defines a UBO
     # with the same name. UBOs must be shared instead of recreated, or else
     # they will not link to the same data.
-    uniform_buffers = {}
+    # uniform_buffers = {}
 
     def __init__(self, *shaders):
         """Create an OpenGL ShaderProgram, from multiple Shaders.
@@ -239,14 +241,18 @@ class ShaderProgram:
         self._introspect_uniform_blocks()
 
         for block in self._uniform_blocks.values():
-            if block.name in self.uniform_buffers:
+            if block.name in pyglet.gl.current_context.uniform_buffers:
                 if _debug_gl_shaders:
                     print("Skipping cached Uniform Buffer Object: `{0}`".format(block.name))
                 continue
-            self.uniform_buffers[block.name] = UniformBufferObject(block=block)
+            pyglet.gl.current_context.uniform_buffers[block.name] = UniformBufferObject(block=block)
 
         if _debug_gl_shaders:
             print(self._get_program_log())
+
+    @property
+    def uniform_buffers(self):
+        return pyglet.gl.current_context.uniform_buffers
 
     @property
     def id(self):

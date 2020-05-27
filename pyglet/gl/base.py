@@ -254,14 +254,6 @@ class Context:
 
     """
 
-    #: Context share behaviour indicating that objects should not be
-    #: shared with existing contexts.
-    CONTEXT_SHARE_NONE = None
-
-    #: Context share behaviour indicating that objects are shared with
-    #: the most recently created context (the default).
-    CONTEXT_SHARE_EXISTING = 1
-
     # gl_info.GLInfo instance, filled in on first set_current
     _info = None
 
@@ -274,6 +266,8 @@ class Context:
             self.object_space = context_share.object_space
         else:
             self.object_space = ObjectSpace()
+
+        self.uniform_buffers = {}
 
     def __repr__(self):
         return '%s()' % self.__class__.__name__
