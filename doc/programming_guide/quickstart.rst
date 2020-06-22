@@ -82,8 +82,8 @@ directory and display it within the window::
 We used the :func:`~pyglet.resource.image` function of :mod:`pyglet.resource`
 to load the image, which automatically locates the file relative to the source
 file (rather than the working directory).  To load an image not bundled with
-the application (for example, specified on the command line, you would use
-:func:`pyglet.image.load`).
+the application (for example, specified on the command line), you would use
+:func:`pyglet.image.load`.
 
 The :meth:`~pyglet.image.AbstractImage.blit` method draws the image.  The
 arguments ``(0, 0)`` tell pyglet to draw the image at pixel coordinates 0,
@@ -213,7 +213,7 @@ section.
 To write advanced 3D applications or achieve optimal performance in your 2D
 applications, you'll need to work with OpenGL directly.  If you only want to
 work with OpenGL primitives, but want something slightly higher-level, have a
-look at the :ref:`programming-guide-graphics` module.
+look at the :ref:`guide_graphics` module.
 
 There are numerous examples of pyglet applications in the ``examples/``
 directory of the documentation and source distributions.  If you get

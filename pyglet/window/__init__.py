@@ -169,9 +169,10 @@ class MouseCursorException(WindowException):
 class MouseCursor:
     """An abstract mouse cursor."""
 
-    #: Indicates if the cursor is drawn using OpenGL.  This is True
-    #: for all mouse cursors except system cursors.
-    drawable = True
+    #: Indicates if the cursor is drawn
+    #: using OpenGL, or natively.
+    gl_drawable = True
+    hw_drawable = False
 
     def draw(self, x, y):
         """Abstract render method.
@@ -188,23 +189,26 @@ class MouseCursor:
                 Y coordinate of the mouse pointer's hot spot.
 
         """
-        raise NotImplementedError('abstract')
+        pass
 
 
 class DefaultMouseCursor(MouseCursor):
-    """The default mouse cursor #sed by the operating system."""
-    drawable = False
+    """The default mouse cursor set by the operating system."""
+    gl_drawable = False
+    hw_drawable = True
 
 
 class ImageMouseCursor(MouseCursor):
     """A user-defined mouse cursor created from an image.
 
     Use this class to create your own mouse cursors and assign them
-    to windows.  There are no constraints on the image size or format.
+    to windows. Cursors can be drawn by OpenGL, or optionally passed
+    to the OS to render natively. There are no restrictions on cursors
+    drawn by OpenGL, but natively rendered cursors may have some
+    platform limitations (such as color depth, or size). In general,
+    reasonably sized cursors will render correctly
     """
-    drawable = True
-
-    def __init__(self, image, hot_x=0, hot_y=0):
+    def __init__(self, image, hot_x=0, hot_y=0, acceleration=False):
         """Create a mouse cursor from an image.
 
         :Parameters:
@@ -213,14 +217,23 @@ class ImageMouseCursor(MouseCursor):
                 valid ``texture`` attribute.
             `hot_x` : int
                 X coordinate of the "hot" spot in the image relative to the
-                image's anchor.
+                image's anchor. May be clamped to the maximum image width
+                if ``acceleration=True``.
             `hot_y` : int
                 Y coordinate of the "hot" spot in the image, relative to the
-                image's anchor.
+                image's anchor. May be clamped to the maximum image height
+                if ``acceleration=True``.
+            `acceleration` : int
+                If True, draw the cursor natively instead of usign OpenGL.
+                The image may be downsampled or color reduced to fit the
+                platform limitations.
         """
         self.texture = image.get_texture()
         self.hot_x = hot_x
         self.hot_y = hot_y
+
+        self.gl_drawable = not acceleration
+        self.hw_drawable = acceleration
 
     def draw(self, x, y):
         gl.glPushAttrib(gl.GL_ENABLE_BIT | gl.GL_CURRENT_BIT)
@@ -485,7 +498,6 @@ class BaseWindow(with_metaclass(_WindowMetaclass, EventDispatcher)):
     _enable_event_queue = True     # overridden by EventLoop.
     _allow_dispatch_event = False  # controlled by dispatch_events stack frame
 
-
     # Class attributes
 
     _default_width = 640
@@ -631,10 +643,8 @@ class BaseWindow(with_metaclass(_WindowMetaclass, EventDispatcher)):
 
         self._caption = caption
 
-
         from pyglet import app
         app.windows.add(self)
-        app.event_loop.update_window_count()
         self._create()
 
         self.switch_to()
@@ -797,8 +807,7 @@ class BaseWindow(with_metaclass(_WindowMetaclass, EventDispatcher)):
         Override this event handler with your own to create another
         projection, for example in perspective.
         """
-        viewport_width, viewport_height = self.get_framebuffer_size()
-        self._projection.set(width, height, viewport_width, viewport_height)
+        self._projection.set(width, height, *self.get_framebuffer_size())
 
     def on_close(self):
         """Default on_close handler."""
@@ -827,7 +836,6 @@ class BaseWindow(with_metaclass(_WindowMetaclass, EventDispatcher)):
         if not self._context:
             return
         app.windows.remove(self)
-        app.event_loop.update_window_count()
         self._context.destroy()
         self._config = None
         self._context = None
@@ -851,9 +859,7 @@ class BaseWindow(with_metaclass(_WindowMetaclass, EventDispatcher)):
         """
         # Draw mouse cursor if set and visible.
         # XXX leaves state in modelview regardless of starting state
-        if (self._mouse_cursor.drawable and
-            self._mouse_visible and
-            self._mouse_in_window):
+        if self._mouse_cursor.gl_drawable and self._mouse_visible and self._mouse_in_window:
             gl.glMatrixMode(gl.GL_PROJECTION)
             gl.glPushMatrix()
             gl.glLoadIdentity()
@@ -1551,10 +1557,10 @@ class BaseWindow(with_metaclass(_WindowMetaclass, EventDispatcher)):
                     Distance in pixels from the left edge of the window.
                 `y` : int
                     Distance in pixels from the bottom edge of the window.
-                `scroll_x` : int
-                    Number of "clicks" towards the right (left if negative).
-                `scroll_y` : int
-                    Number of "clicks" upwards (downwards if negative).
+                `scroll_x` : float
+                    Amount of movement on the horizontal axis.
+                `scroll_y` : float
+                    Amount of movement on the vertical axis.
 
             :event:
             """

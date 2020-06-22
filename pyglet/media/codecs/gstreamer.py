@@ -98,7 +98,7 @@ class GStreamerSource(StreamingSource):
         self.decoder.connect("unknown-type", self._unknown_type)
 
         # Set the sink's capabilities and behavior:
-        self.sink.set_property('caps', Gst.Caps.from_string('audio/x-raw'))
+        self.sink.set_property('caps', Gst.Caps.from_string('audio/x-raw,format=S16LE'))
         self.sink.set_property('drop', False)
         self.sink.set_property('sync', False)
         self.sink.set_property('max-buffers', 5)
@@ -249,16 +249,17 @@ class GStreamerDecoder(MediaDecoder):
     def decode(self, file, filename, streaming=True):
 
         if not any(filename.endswith(ext) for ext in self.get_file_extensions()):
-            # Do not try to decode other formats or Video for now.
+            # Refuse to decode anything not specifically listed in the supported
+            # file extensions list. This decoder does not yet support video, but
+            # it would still decode it and return only the Audio track. This is
+            # not desired, since the other decoders will not get a turn. Instead
+            # we bail out and let pyglet pass it to the next codec (FFmpeg).
             raise GStreamerDecodeException('Unsupported format.')
 
         if streaming:
             return GStreamerSource(filename, file)
         else:
             return StaticSource(GStreamerSource(filename, file))
-
-    def __del__(self):
-        self._glib_loop.mainloop.quit()
 
 
 def get_decoders():

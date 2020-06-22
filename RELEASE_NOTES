@@ -1,3 +1,81 @@
+pyglet 1.5.8
+Bugfix and maintenance release
+
+Bugfixes
+--------
+
+Improvements
+------------
+- Consolidate Codec logic into base class to reuse among various modules.
+
+
+pyglet 1.5.7
+Bugfix release
+
+Bugfixes
+--------
+- Fix crash when no audio device is available.
+- Prevent `__del__` spam in DirectSound buffers and Wave decoder.
+- Explicitly cast warnings.warn message to a str to prevent numba error.
+
+
+pyglet 1.5.6
+Bugfix and feature release
+
+Bugfixes
+--------
+- Fix infinite recursion error on OSX. (#5)
+- The on_mouse_scroll event no longer clamps to int, preventing lost motion on trackpads.
+- Prevent traceback when DirectSound buffers are garbage collected on exit.
+- Fix StaticSource playback with WMF decoder (streaming=False).
+- Fix colorspace for WMF video decoding.
+- Prevent crash on garbage collection for FFmpeg decoder.
+
+Improvements
+------------
+- New image decoder leveraging Windows Imaging Component (WIC).
+- TextureAtlas/Bins now have a `border` argument for leaving n-pixels of blank space around
+  images when adding. By default the `resource` module leaves a 1-pixel space around images.
+- Many small documentation fixes and corrections.
+
+
+pyglet 1.5.5
+Bugfix and feature release
+
+Bugfixes
+--------
+- GStreamer decoder clamped to 16bit sample width, since the default OpenAL backend on Linux does
+  not support anything higher.
+
+Improvements
+------------
+- shapes module: added `Circle.rotation` property and blending to standalone shape `draw` methods.
+- shapes module: added missing `delete` and `__del__` methods.
+- The ImageMouseCursor has a new `accelerated` parameter to allow custom mouse points to be drawn
+  natively on Windows and Linux.
+
+
+pyglet 1.5.4
+Bugfix and minor feature release
+
+Bugfixes
+--------
+- Avoid WMFDecoder crash when mixing pyglet with other tookits. (#174)
+- Prevent EventDispatcher subclasses from hiding AttributeError exceptions.
+
+Improvements
+------------
+- Added `pyglet.graphics.shapes` module for creating simple 2D shapes.
+
+
+pyglet 1.5.3
+Bugfix release
+
+Bugfixes
+--------
+- Fix memory leak caused by not freeing stale buffers and textures.
+
+
 pyglet 1.5.2
 Bugfix and minor feature release
 

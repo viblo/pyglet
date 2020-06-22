@@ -33,10 +33,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 # ----------------------------------------------------------------------------
 
-"""Various utility functions
+"""Various utility functions used internally by pyglet
 """
 
+import os
 import sys
+import importlib
+
+import pyglet
 
 
 def asbytes(s):
@@ -92,3 +96,153 @@ def with_metaclass(meta, *bases):
             return meta(name, bases, d)
 
     return MetaClass('temporary_class', None, {})
+
+
+def debug_print(enabled_or_option='debug'):
+    """Get a debug printer that is enabled based on a boolean input or a pyglet option.
+    The debug print function returned should be used in an assert. This way it can be
+    optimized out when running python with the -O flag.
+
+    Usage example::
+
+        from pyglet.debug import debug_print
+        _debug_media = debug_print('debug_media')
+
+        def some_func():
+            assert _debug_media('My debug statement')
+
+    :parameters:
+        `enabled_or_options` : bool or str
+            If a bool is passed, debug printing is enabled if it is True. If str is passed
+            debug printing is enabled if the pyglet option with that name is True.
+
+    :returns: Function for debug printing.
+    """
+    if isinstance(enabled_or_option, bool):
+        enabled = enabled_or_option
+    else:
+        enabled = pyglet.options.get(enabled_or_option, False)
+
+    if enabled:
+        def _debug_print(*args, **kwargs):
+            print(*args, **kwargs)
+            return True
+
+    else:
+        def _debug_print(*args, **kwargs):
+            return True
+
+    return _debug_print
+
+
+class Codecs:
+    """utility class for handling adding and querying of codecs."""
+
+    def __init__(self):
+        self._decoders = []
+        self._encoders = []
+        self._decoder_extensions = {}   # Map str -> list of matching ImageDecoders
+        self._encoder_extensions = {}   # Map str -> list of matching ImageEncoders
+
+    def get_encoders(self, filename=None):
+        """Get an ordered list of all encoders. If a `filename` is provided,
+        encoders supporting that extension will be ordered first in the list.
+        """
+        encoders = []
+        if filename:
+            extension = os.path.splitext(filename)[1].lower()
+            encoders += self._encoder_extensions.get(extension, [])
+        encoders += [e for e in self._encoders if e not in encoders]
+        return encoders
+
+    def get_decoders(self, filename=None):
+        """Get an ordered list of all decoders. If a `filename` is provided,
+        decoders supporting that extension will be ordered first in the list.
+        """
+        decoders = []
+        if filename:
+            extension = os.path.splitext(filename)[1].lower()
+            decoders += self._decoder_extensions.get(extension, [])
+        decoders += [e for e in self._decoders if e not in decoders]
+        return decoders
+
+    def add_decoders(self, module):
+        """Add a decoder module.  The module must define `get_decoders`.  Once
+        added, the appropriate decoders defined in the codec will be returned by
+        Codecs.get_decoders.
+        """
+        for decoder in module.get_decoders():
+            self._decoders.append(decoder)
+            for extension in decoder.get_file_extensions():
+                if extension not in self._decoder_extensions:
+                    self._decoder_extensions[extension] = []
+                self._decoder_extensions[extension].append(decoder)
+
+    def add_encoders(self, module):
+        """Add an encoder module.  The module must define `get_encoders`.  Once
+        added, the appropriate encoders defined in the codec will be returned by
+        Codecs.get_encoders.
+        """
+        for encoder in module.get_encoders():
+            self._encoders.append(encoder)
+            for extension in encoder.get_file_extensions():
+                if extension not in self._encoder_extensions:
+                    self._encoder_extensions[extension] = []
+                self._encoder_extensions[extension].append(encoder)
+
+
+class Decoder:
+    def get_file_extensions(self):
+        """Return a list or tuple of accepted file extensions, e.g. ['.wav', '.ogg']
+        Lower-case only.
+        """
+        return []
+
+    def decode(self, *args, **kwargs):
+        """Read and decode the given file object and return an approprite
+        pyglet object. Throws DecodeException if there is an error.
+        `filename` can be a file type hint.
+        """
+        raise NotImplementedError()
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+    def __eq__(self, other):
+        return self.__class__.__name__ == other.__class__.__name__
+
+    def __repr__(self):
+        return "{0}{1}".format(self.__class__.__name__, self.get_file_extensions())
+
+
+class Encoder:
+    def get_file_extensions(self):
+        """Return a list or tuple of accepted file extensions, e.g. ['.wav', '.ogg']
+        Lower-case only.
+        """
+        return []
+
+    def encode(self, media, file, filename):
+        """Encode the given media type to the given file.  `filename`
+        provides a hint to the file format desired.  options are
+        encoder-specific, and unknown options should be ignored or
+        issue warnings.
+        """
+        raise NotImplementedError()
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+    def __eq__(self, other):
+        return self.__class__.__name__ == other.__class__.__name__
+
+    def __repr__(self):
+        return "{0}{1}".format(self.__class__.__name__, self.get_file_extensions())
+
+
+class DecodeException(Exception):
+    exception_priority = 10
+
+
+class EncodeException(Exception):
+    pass
