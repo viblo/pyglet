@@ -54,7 +54,6 @@ _uniform_setters = {
     # GL_FLOAT_MAT4x3: glUniformMatrix4x3fv,
 }
 
-
 _attribute_types = {
     GL_BOOL: '1?',
     GL_BOOL_VEC2: '2?',
@@ -178,7 +177,7 @@ class Shader:
             raise GLException("The {0} shader failed to compile. "
                               "\n{1}".format(self.type, self._get_shader_log(shader_id)))
         elif _debug_gl_shaders:
-            print("Shader compilation log: {0}".format(self._get_shader_log(shader_id)))
+            print(f"Shader '{shader_id}' compilation log: '{self._get_shader_log(shader_id)}'")
 
         self._id = shader_id
 
@@ -200,13 +199,12 @@ class Shader:
     def __del__(self):
         try:
             glDeleteShader(self._id)
+            if _debug_gl_shaders:
+                print(f"Destroyed {self.type} Shader '{self._id}'")
         except (ImportError, AttributeError):
             # Interpreter is shutting down,
             # or Shader failed to compile.
             pass
-
-        if _debug_gl_shaders:
-            print("Destroyed {0} shader object id {1}.".format(self.type, self.id))
 
     def __repr__(self):
         return "{0}(id={1}, type={2})".format(self.__class__.__name__, self.id, self.type)
@@ -274,7 +272,7 @@ class ShaderProgram:
             return ("OpenGL returned the following message when linking the program: "
                     "\n{0}".format(result_str.value))
         else:
-            return "Program linked successfully."
+            return f"Program '{self._id}' linked successfully."
 
     @staticmethod
     def _link_program(shaders):

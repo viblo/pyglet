@@ -440,6 +440,9 @@ class Batch:
 
         return vlist
 
+    def create(self):
+        pass
+
     def add_indexed(self, count, mode, group, indices, shaderprogram, *data):
         # TODO: update to new API
         """Add an indexed vertex list to the batch.
